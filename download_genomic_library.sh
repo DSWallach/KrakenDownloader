@@ -33,87 +33,10 @@ FTP_SERVER="ftp://$NCBI_SERVER"
 RSYNC_SERVER="rsync://$NCBI_SERVER"
 THIS_DIR=$PWD
 
-case "$1" in
-  "bacteria")
-    mkdir -p $LIBRARY_DIR/Bacteria
-    cd $LIBRARY_DIR/Bacteria
-    if [ ! -e "lib.complete" ]
-    then
-      rm -f all.fna.tar.gz
-      wget $FTP_SERVER/genomes/archive/old_refseq/Bacteria/all.fna.tar.gz
-      echo -n "Unpacking..."
-      tar zxf all.fna.tar.gz
-      rm all.fna.tar.gz
-      echo " complete."
-      touch "lib.complete"
-    else
-      echo "Skipping download of bacterial genomes, already downloaded here."
-    fi
-    ;;
-  "plasmids")
-    mkdir -p $LIBRARY_DIR/Plasmids
-    cd $LIBRARY_DIR/Plasmids
-    if [ ! -e "lib.complete" ]
-    then
-      rm -f plasmids.all.fna.tar.gz
-      wget $FTP_SERVER/genomes/archive/old_refseq/Plasmids/plasmids.all.fna.tar.gz
-      echo -n "Unpacking..."
-      tar zxf plasmids.all.fna.tar.gz
-      rm plasmids.all.fna.tar.gz
-      echo " complete."
-      touch "lib.complete"
-    else
-      echo "Skipping download of plasmids, already downloaded here."
-    fi
-    ;;
-  "viruses")
-    mkdir -p $LIBRARY_DIR/Viruses
-    cd $LIBRARY_DIR/Viruses
-    if [ ! -e "lib.complete" ]
-    then
-      rm -f all.fna.tar.gz
-      rm -f all.ffn.tar.gz
-      wget $FTP_SERVER/genomes/Viruses/all.fna.tar.gz
-      wget $FTP_SERVER/genomes/Viruses/all.ffn.tar.gz
-      echo -n "Unpacking..."
-      tar zxf all.fna.tar.gz
-      tar zxf all.ffn.tar.gz
-      rm all.fna.tar.gz
-      rm all.ffn.tar.gz
-      echo " complete."
-      touch "lib.complete"
-    else
-      echo "Skipping download of viral genomes, already downloaded here."
-    fi
-    ;;
-  "human")
-    mkdir -p $LIBRARY_DIR/Human
-    cd $LIBRARY_DIR/Human
-    if [ ! -e "lib.complete" ]
-    then
-      # get list of CHR_* directories
-      wget --spider --no-remove-listing $FTP_SERVER/genomes/H_sapiens/
-      directories=$(perl -nle '/^d/ and /(CHR_\w+)\s*$/ and print $1' .listing)
-      rm .listing
+perl download_all.pl "$1"
 
-      # For each CHR_* directory, get GRCh* fasta gzip file name, d/l, unzip, and add
-      for directory in $directories
-      do
-        wget --spider --no-remove-listing $FTP_SERVER/genomes/H_sapiens/$directory/
-        file=$(perl -nle '/^-/ and /\b(hs_ref_GRCh\w+\.fa\.gz)\s*$/ and print $1' .listing)
-        [ -z "$file" ] && exit 1
-        rm .listing
-        wget $FTP_SERVER/genomes/H_sapiens/$directory/$file
-        gunzip "$file"
-      done
+find "$1" -name '*.fna' -print0 | \
+    xargs -0 -I{} -n1 kraken-build \
+    --add-to-library {} --ab $DB_NAME
 
-      touch "lib.complete"
-    else
-      echo "Skipping download of human genome, already downloaded here."
-    fi
-    ;;
-  *)
-    echo "Unsupported library.  Valid options are: "
-    echo "  bacteria plasmids virus human"
-    ;;
-esac
+kraken-build --build --db $DB_name
